@@ -7,9 +7,7 @@ final class PhotoLibTests: XCTestCase {
         // Use XCTAssert and related functions to verify your tests produce the correct
         // results.
         
-        PBPhotoManager.getCameraRollAlbum(allowSelectImage: true, allowSelectVideo: true) { (c, r, o) in
-            
-        }
+       
         
     }
 

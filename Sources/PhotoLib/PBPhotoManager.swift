@@ -7,7 +7,70 @@
 
 import UIKit
 import Photos
+
 open class PBPhotoManager: NSObject {
+
+    /// 保存图像到相册
+    open class func saveImageToAlbum(image: UIImage, completion: ( (Bool, PHAsset?) -> Void )? ) {
+        
+        if !havePhotoLibratyAuthority() {
+            completion?(false, nil)
+            return
+        }
+        
+        var placeholderAsset: PHObjectPlaceholder? = nil
+        PHPhotoLibrary.shared().performChanges({
+            let newAssetRequest = PHAssetChangeRequest.creationRequestForAsset(from: image)
+            placeholderAsset = newAssetRequest.placeholderForCreatedAsset
+        }) { (suc, error) in
+            DispatchQueue.main.async {
+                if suc {
+                    let asset = self.getAsset(from: placeholderAsset?.localIdentifier)
+                    completion?(suc, asset)
+                } else {
+                    completion?(false, nil)
+                }
+            }
+        }
+    }
+    
+    /// 保存视频到相册.
+    open class func saveVideoToAlbum(url: URL, completion: ( (Bool, PHAsset?) -> Void )? ) {
+        
+        if !havePhotoLibratyAuthority() {
+            completion?(false, nil)
+            return
+        }
+        
+        var placeholderAsset: PHObjectPlaceholder? = nil
+        PHPhotoLibrary.shared().performChanges({
+            let newAssetRequest = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
+            placeholderAsset = newAssetRequest?.placeholderForCreatedAsset
+        }) { (suc, error) in
+            DispatchQueue.main.async {
+                if suc {
+                    let asset = self.getAsset(from: placeholderAsset?.localIdentifier)
+                    completion?(suc, asset)
+                } else {
+                    completion?(false, nil)
+                }
+            }
+        }
+    }
+    
+    private class func getAsset(from localIdentifier: String?) -> PHAsset? {
+        guard let id = localIdentifier else {
+            return nil
+        }
+        let result = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
+        if result.count > 0{
+            return result[0]
+        }
+        return nil
+    }
+    
+    
+    
     
     /// 获取相册列表
     /// - Parameters:
@@ -15,7 +78,13 @@ open class PBPhotoManager: NSObject {
     ///   - allowSelectImage: 是否选图片
     ///   - allowSelectVideo:  是否选视频
     ///   - completion: 回调
-     open class func getPhotoAlbumList(ascending: Bool, allowSelectImage: Bool, allowSelectVideo: Bool, completion: ( ([PHFetchResult<PHCollection>]) -> Void )) {
+     open class func getPhotoAlbumList(ascending: Bool, allowSelectImage: Bool, allowSelectVideo: Bool, completion: ( (Bool, [PHFetchResult<PHCollection>]?) -> Void )) {
+        
+        if !havePhotoLibratyAuthority() {
+            completion(false, nil)
+            return
+        }
+        
         let option = PHFetchOptions()
         if !allowSelectImage {
             option.predicate = NSPredicate(format: "mediaType == %ld", PHAssetMediaType.video.rawValue)
@@ -30,11 +99,17 @@ open class PBPhotoManager: NSObject {
         let syncedAlbums = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumSyncedAlbum, options: nil) as! PHFetchResult<PHCollection>
         let sharedAlbums = PHAssetCollection.fetchAssetCollections(with: .album, subtype: .albumCloudShared, options: nil) as! PHFetchResult<PHCollection>
         let arr = [smartAlbums, streamAlbums, userAlbums, syncedAlbums, sharedAlbums]
-        completion(arr)
+        completion(true, arr)
     }
     
     /// 获取相机Asset
-    open class func getCameraRollAlbum(allowSelectImage: Bool, allowSelectVideo: Bool, completion: @escaping ( (PHAssetCollection, PHFetchResult<PHAsset>, PHFetchOptions) -> Void )) {
+    open class func getCameraRollAlbum(allowSelectImage: Bool, allowSelectVideo: Bool, completion: @escaping ( (Bool, PHAssetCollection?, PHFetchResult<PHAsset>?, PHFetchOptions?) -> Void )) {
+        
+        if !havePhotoLibratyAuthority() {
+            completion(false, nil, nil, nil)
+            return
+        }
+        
         let option = PHFetchOptions()
         if !allowSelectImage {
             option.predicate = NSPredicate(format: "mediaType == %ld", PHAssetMediaType.video.rawValue)
@@ -47,7 +122,7 @@ open class PBPhotoManager: NSObject {
         smartAlbums.enumerateObjects { (collection, _, stop) in
             if collection.assetCollectionSubtype == .smartAlbumUserLibrary {
                 let result = PHAsset.fetchAssets(in: collection, options: option)
-                completion(collection,result,option)
+                completion(true, collection,result,option)
                 stop.pointee = true
             }
         }
@@ -108,7 +183,6 @@ open class PBPhotoManager: NSObject {
         
         return title ?? "所有照片"
     }
-    
     
     
     /// 获取图片
@@ -271,87 +345,15 @@ open class PBPhotoManager: NSObject {
         }
     }
     
-    /// 保存图像到相册
-    open class func saveImageToAlbum(image: UIImage, completion: ( (Bool, PHAsset?) -> Void )? ) {
-        let status = PHPhotoLibrary.authorizationStatus()
-        
-        if status == .denied || status == .restricted {
-            completion?(false, nil)
-            return
-        }
-        
-        var placeholderAsset: PHObjectPlaceholder? = nil
-        PHPhotoLibrary.shared().performChanges({
-            let newAssetRequest = PHAssetChangeRequest.creationRequestForAsset(from: image)
-            placeholderAsset = newAssetRequest.placeholderForCreatedAsset
-        }) { (suc, error) in
-            DispatchQueue.main.async {
-                if suc {
-                    let asset = self.getAsset(from: placeholderAsset?.localIdentifier)
-                    completion?(suc, asset)
-                } else {
-                    completion?(false, nil)
-                }
-            }
-        }
-    }
-    
-    /// 保存视频到相册.
-    open class func saveVideoToAlbum(url: URL, completion: ( (Bool, PHAsset?) -> Void )? ) {
-        let status = PHPhotoLibrary.authorizationStatus()
-        
-        if status == .denied || status == .restricted {
-            completion?(false, nil)
-            return
-        }
-        
-        var placeholderAsset: PHObjectPlaceholder? = nil
-        PHPhotoLibrary.shared().performChanges({
-            let newAssetRequest = PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: url)
-            placeholderAsset = newAssetRequest?.placeholderForCreatedAsset
-        }) { (suc, error) in
-            DispatchQueue.main.async {
-                if suc {
-                    let asset = self.getAsset(from: placeholderAsset?.localIdentifier)
-                    completion?(suc, asset)
-                } else {
-                    completion?(false, nil)
-                }
-            }
-        }
-    }
-    
-    private class func getAsset(from localIdentifier: String?) -> PHAsset? {
-        guard let id = localIdentifier else {
-            return nil
-        }
-        let result = PHAsset.fetchAssets(withLocalIdentifiers: [id], options: nil)
-        if result.count > 0{
-            return result[0]
-        }
-        return nil
-    }
-    
 }
 
 
 extension PBPhotoManager {
     
     public class func havePhotoLibratyAuthority() -> Bool {
-        return PHPhotoLibrary.authorizationStatus() == .authorized
-    }
-    
-    public class func haveCameraAuthority() -> Bool {
-        let status = AVCaptureDevice.authorizationStatus(for: .video)
-        if status == .restricted || status == .denied {
-            return false
-        }
-        return true
-    }
-    
-    public class func haveMicrophoneAuthority() -> Bool {
-        let status = AVCaptureDevice.authorizationStatus(for: .audio)
-        if status == .restricted || status == .denied {
+        
+        let status = PHPhotoLibrary.authorizationStatus()
+        if status == .denied || status == .restricted {
             return false
         }
         return true
