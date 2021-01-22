@@ -6,7 +6,11 @@ final class PhotoLibTests: XCTestCase {
         // This is an example of a functional test case.
         // Use XCTAssert and related functions to verify your tests produce the correct
         // results.
-        XCTAssertEqual(PhotoLib().text, "Hello, World!")
+        
+        PBPhotoManager.getCameraRollAlbum(allowSelectImage: true, allowSelectVideo: true) { (c, r, o) in
+            
+        }
+        
     }
 
     static var allTests = [
